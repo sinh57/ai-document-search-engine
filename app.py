@@ -1,7 +1,7 @@
 import streamlit as st
 from utils import get_pdf_text, get_text_chunks, get_vectorstore
-from langchain_community.llms import Ollama
-from langchain.chains import ConversationalRetrievalChain
+from langchain_groq import ChatGroq
+from langchain_classic.chains import ConversationalRetrievalChain
 
 def init_session_state():
     """Initialize session state variables."""
@@ -38,8 +38,12 @@ def main():
                     # 2. Embed into FAISS
                     st.session_state.vectorstore = get_vectorstore(text_chunks)
                     
-                    # 3. Initialize memory-enabled Conversational Chain
-                    llm = Ollama(model="llama3")
+                    # 3. Initialize memory-enabled Conversational Chain with Groq
+                    groq_api_key = st.secrets["GROQ_API_KEY"]
+                    llm = ChatGroq(
+                        groq_api_key=groq_api_key,
+                        model_name="llama-3.3-70b-versatile"
+                    )
                     st.session_state.qa_chain = ConversationalRetrievalChain.from_llm(
                         llm=llm,
                         retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
@@ -77,10 +81,12 @@ def main():
             
             # Formulate history tuples for Langchain: [(q1, a1), (q2, a2)]
             langchain_history = []
-            for i in range(0, len(st.session_state.chat_history)-1, 2):
-                if st.session_state.chat_history[i]["role"] == "user" and st.session_state.chat_history[i+1]["role"] == "assistant":
+            for i in range(0, len(st.session_state.chat_history) - 1, 2):
+                if (i + 1 < len(st.session_state.chat_history)
+                        and st.session_state.chat_history[i]["role"] == "user"
+                        and st.session_state.chat_history[i + 1]["role"] == "assistant"):
                     user_q = st.session_state.chat_history[i]["content"]
-                    bot_a = st.session_state.chat_history[i+1]["content"]
+                    bot_a = st.session_state.chat_history[i + 1]["content"]
                     langchain_history.append((user_q, bot_a))
 
             # Display assistant response block
